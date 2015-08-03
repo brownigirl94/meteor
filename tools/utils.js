@@ -52,33 +52,44 @@ var parseUrl = function (str, defaults) {
 };
 
 var ipAddress = function () {
-  var netroute = require('netroute');
-  var info = netroute.getInfo();
-  var defaultRoute = _.findWhere(info.IPv4 || [], { destination: "0.0.0.0" });
-  if (! defaultRoute) {
-    return null;
+  let defaultRoute;
+  // netroute is not available on Windows
+  if (process.platform !== "win32") {
+    const netroute = require('netroute');
+    const info = netroute.getInfo();
+    defaultRoute = _.findWhere(info.IPv4 || [], { destination: "0.0.0.0" });
   }
 
-  var iface = defaultRoute["interface"];
+  const interfaces = os.networkInterfaces();
+  if (defaultRoute) {
+    // If we know the default route, find the IPv4 address associated
+    // with that interface
+    const iface = defaultRoute["interface"];
+    const addressEntry = _.findWhere(interfaces[iface], { family: "IPv4" });
 
-  var getAddress = function (iface) {
-    var interfaces = os.networkInterfaces();
-    return _.findWhere(interfaces[iface], { family: "IPv4" });
-  };
-
-  var address = getAddress(iface);
-  if (! address) {
-    // Retry after a couple seconds in case the user is connecting or
-    // disconnecting from the Internet.
-    utils.sleepMs(2000);
-    address = getAddress(iface);
-    if (! address) {
+    if (!addressEntry) {
       throw new Error(
-"Interface '" + iface + "' not found in interface list, or\n" +
-"does not have an IPv4 address.");
+`Interface '${iface}' not found in interface list,
+or does not have an IPv4 address.`);
     }
+
+    return addressEntry.address;
+  } else {
+    // If we don't know the default route, we'll lookup all non-internal
+    // IPv4 addresses and hope to find only one
+    let addressEntries = _.chain(interfaces).values().flatten().
+      where({ family: "IPv4", internal: false }).value();
+
+    if (addressEntries.length == 0) {
+      throw new Error(
+`Could not determine a local IPv4 address.`);
+    } else if (addressEntries.length > 1) {
+      throw new Error(
+`Could not determine a unique local IPv4 address, found multiple:
+${addressEntries}`);
+
+    return addressEntries[0].address;
   }
-  return address.address;
 };
 
 exports.hasScheme = function (str) {
