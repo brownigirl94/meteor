@@ -21,9 +21,6 @@ Package.onUse(function(api) {
     // Most Meteor core packages depend on Underscore right now
     'underscore',
 
-    // Many client-side Meteor core packages depend on JQuery right now
-    'jquery',
-
     // The protocol and client/server libraries that Meteor uses to send data
     'ddp',
     'livedata', // XXX COMPAT WITH PACKAGES BUILT FOR 0.9.0.
